@@ -5,6 +5,7 @@ import requests_mock
 
 from bears.general.InvalidLinkBear import InvalidLinkBear
 from coalib.settings.Section import Section
+from coalib.settings.Setting import Setting
 
 
 def custom_matcher(request):
@@ -38,10 +39,12 @@ class InvalidLinkBearTest(unittest.TestCase):
     def setUp(self):
         self.section = Section("")
 
-    def assertResult(self, valid_file=None, invalid_file=None):
+    def assertResult(self, valid_file=None, invalid_file=None, settings={}):
         with requests_mock.Mocker() as m:
             InvalidLinkBear.check_prerequisites = lambda *args: True
             uut = InvalidLinkBear(self.section, Queue())
+            for name, value in settings.items():
+                self.section.append(Setting(name, value))
             m.add_matcher(custom_matcher)
             if valid_file:
                 out = uut.execute("valid", valid_file)
@@ -141,3 +144,21 @@ class InvalidLinkBearTest(unittest.TestCase):
 
         self.assertResult(valid_file=long_url_redirect,
                           invalid_file=short_url_redirect)
+
+    def test_ignore_regex(self):
+
+        valid_file = """
+        http://sub.example.com
+        """.splitlines()
+
+        self.assertResult(valid_file=valid_file)
+
+        valid_file = """
+        http://httpbin.org/status/524
+        """.splitlines()
+        invalid_file = """
+        http://httpbin.org/status/503
+        """.splitlines()
+        self.assertResult(valid_file=valid_file,
+                          invalid_file=invalid_file,
+                          settings={'ignore_regex': '[1-9]{2}$'})
